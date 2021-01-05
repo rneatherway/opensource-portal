@@ -154,6 +154,7 @@ const thisProviderType = EntityImplementation.Type;
 export interface IElectionNominationEntityProvider {
   getNomination(nominationId: string): Promise<ElectionNominationEntity>;
   insertNomination(record: ElectionNominationEntity): Promise<string>;
+  deleteNomination(record: ElectionNominationEntity): Promise<void>;
   updateNomination(record: ElectionNominationEntity): Promise<void>;
   queryApprovedElectionNominees(electionId: string): Promise<ElectionNominationEntity[]>;
   queryAllElectionNominees(electionId: string): Promise<ElectionNominationEntity[]>;
@@ -168,6 +169,11 @@ export class ElectionNominationEntityProvider extends EntityMetadataBase impleme
   async updateNomination(metadata: ElectionNominationEntity): Promise<void> {
     const entity = this.serialize(thisProviderType, metadata);
     await this._entities.updateMetadata(entity);
+  }
+  
+  async deleteNomination(metadata: ElectionNominationEntity): Promise<void> {
+    const entity = this.serialize(thisProviderType, metadata);
+    await this._entities.deleteMetadata(entity);
   }
 
   async getNomination(nominationId: string): Promise<ElectionNominationEntity> {

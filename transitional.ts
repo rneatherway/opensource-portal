@@ -47,6 +47,21 @@ import { IElectionNominationCommentEntityProvider } from './entities/voting/nomi
 import { IReposApplication } from './app';
 import { IUserSettingsProvider } from './entities/userSettings';
 import { ICorporationAdministrationSection } from './routes/administration/corporation';
+import { AccessToken, AuthorizationCode } from 'simple-oauth2';
+
+import appPackage = require('./package.json');
+import { IMicrosoftMetadataProvider, MicrosoftClassification } from './microsoft/entities/msftMetadata';
+import BlobCache from './lib/caching/blob';
+import { ProductCatalog } from './microsoft/productCatalog/productCatalog';
+import { Session } from 'express-session';
+const packageVariableName = 'static-react-package-name';
+
+export function hasStaticReactClientApp() {
+  const staticClientPackageName = appPackage[packageVariableName];
+  if (process.env.ENABLE_REACT_CLIENT && staticClientPackageName) {
+    return staticClientPackageName;
+  }
+}
 
 export interface ICallback<T> {
   (error: IReposError, result?: T): void;
@@ -149,6 +164,7 @@ export interface IDictionary<TValue> {
 export interface IProviders {
   app: IReposApplication;
   applicationProfile: IApplicationProfile;
+  authorizationCodeClient?: AuthorizationCode;
   corporateAdministrationProfile?: ICorporationAdministrationSection;
   corporateViews?: any;
   approvalProvider?: IApprovalProvider;
@@ -163,6 +179,7 @@ export interface IProviders {
   electionVoteProvider?: IElectionVoteEntityProvider;
   electionNominationProvider?: IElectionNominationEntityProvider;
   electionNominationCommentProvider?: IElectionNominationCommentEntityProvider;
+  diagnosticsDrop?: BlobCache;
   healthCheck?: any;
   keyEncryptionKeyResolver?: any;
   github?: RestLibrary;
@@ -172,9 +189,11 @@ export interface IProviders {
   localExtensionKeyProvider?: ILocalExtensionKeyProvider;
   mailAddressProvider?: IMailAddressProvider;
   mailProvider?: IMailProvider;
+  microsoftMetadataProvider?: IMicrosoftMetadataProvider;
   operations?: Operations;
   organizationMemberCacheProvider?: IOrganizationMemberCacheProvider;
   organizationSettingsProvider?: IOrganizationSettingProvider;
+  productCatalog?: ProductCatalog;
   postgresPool?: PostgresPool;
   queryCache?: QueryCache;
   webhookQueueProcessor?: IQueueProcessor;
@@ -211,6 +230,32 @@ export interface IApplicationProfile {
   startup?: (providers: IProviders) => Promise<void>;
   sessions: boolean;
   webServer: boolean;
+}
+
+// CONSIDER: relocate these types properly
+export interface INewRepoMicrosoftMetadata {
+  serviceTree?: IMicrosoftMetadataServiceTree;
+  maintainers?: IMicrosoftMetadataMaintainersProjected;
+  classification?: MicrosoftClassification;
+}
+
+export interface IMicrosoftMetadataServiceTree {
+  id: string;
+}
+
+export interface IMicrosoftMetadataMaintainers {
+  individual: boolean;
+  individual0: string;
+  individual1: string;
+  individual2: string;
+  individual3: string;
+  individual4: string;
+  securityGroup: string;
+}
+
+export interface IMicrosoftMetadataMaintainersProjected {
+  individuals: string[];
+  securityGroup: string;
 }
 
 export interface RedisOptions {
@@ -280,6 +325,7 @@ export interface ReposAppRequest extends Request {
   // FUTURE:
   apiContext: IndividualContext;
   individualContext: IndividualContext;
+  oauthAccessToken: AccessToken;
 }
 
 export interface IReposAppResponse extends Response {
@@ -342,25 +388,37 @@ export function permissionsObjectToValue(permissions): GitHubRepositoryPermissio
     return GitHubRepositoryPermission.Admin;
   } else if (permissions.push === true) {
     return GitHubRepositoryPermission.Push;
+  } else if (permissions.triage === true) {
+    return GitHubRepositoryPermission.Triage;
+  } else if (permissions.maintain === true) {
+    return GitHubRepositoryPermission.Maintain;
   } else if (permissions.pull === true) {
     return GitHubRepositoryPermission.Pull;
   }
   throw new Error(`Unsupported GitHubRepositoryPermission value inside permissions`);
 }
 
-export function isPermissionBetterThan(currentBest, newConsideration) {
+export function isPermissionBetterThan(currentBest: GitHubRepositoryPermission, newConsideration: GitHubRepositoryPermission) {
   switch (newConsideration) {
-    case 'admin':
+    case GitHubRepositoryPermission.Admin:
       return true;
-    case 'push':
-      if (currentBest !== 'admin') {
+    case GitHubRepositoryPermission.Maintain:
+      if (currentBest !== GitHubRepositoryPermission.Admin) {
         return true;
       }
       break;
-    case 'pull':
+    case GitHubRepositoryPermission.Push:
+      if (currentBest !== GitHubRepositoryPermission.Admin) {
+        return true;
+      }
+      break;
+    case GitHubRepositoryPermission.Pull:
       if (currentBest === null) {
         return true;
       }
+      break;
+    case GitHubRepositoryPermission.Triage:
+      // not really great
       break;
     default:
       throw new Error(`Invalid permission type ${newConsideration}`);
@@ -377,6 +435,10 @@ export function MassagePermissionsToGitHubRepositoryPermission(value: string): G
       return GitHubRepositoryPermission.Push;
     case 'admin':
       return GitHubRepositoryPermission.Admin;
+    case 'triage':
+      return GitHubRepositoryPermission.Triage;
+    case 'maintain':
+      return GitHubRepositoryPermission.Maintain;
     case 'pull':
     case 'read':
       return GitHubRepositoryPermission.Pull;
@@ -507,3 +569,22 @@ export function stripDistFolderName(dirname: string) {
   }
   return dirname;
 }
+
+export interface IUserAlert {
+  message: string;
+  title: string;
+  context: UserAlertType;
+  optionalLink: string;
+  optionalCaption: string;
+
+}
+
+interface IAppSessionProperties extends Session {
+  enableMultipleAccounts: boolean;
+  selectedGithubId: string;
+  passport: any;
+  id: string;
+  alerts?: IUserAlert[];
+}
+
+export interface IAppSession extends IAppSessionProperties {}

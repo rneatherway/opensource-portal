@@ -26,6 +26,15 @@ export class Collaborator {
     }
   }
 
+  asJson() {
+    return {
+      avatar_url: this.avatar_url,
+      id: this._id,
+      login: this._login,
+      permissions: this._permissions,
+    };
+  }
+
   get permissions(): any {
     return this._permissions;
   }

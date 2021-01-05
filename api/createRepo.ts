@@ -87,14 +87,13 @@ export async function CreateRepository(req, bodyOverride: unknown, entrypoint: C
     template: properties['ms.template'] || req.headers['ms-template'],
     projectType: properties['ms.project-type'] || req.headers['ms-project-type'],
   };
-  // Validate licenses
+  // Validate licenses when present
   let msLicense = msProperties.license;
-  if (!msLicense) {
-    throw jsonError(new Error('Missing license metadata'), 422);
-  }
-  msLicense = msLicense.toLowerCase();
-  if (supportedLicenseExpressions.indexOf(msLicense) < 0) {
-    throw jsonError(new Error('The provided license expression is not currently supported'), 422);
+  if (msLicense) {
+    msLicense = msLicense.toLowerCase();
+    if (supportedLicenseExpressions.indexOf(msLicense) < 0) {
+      throw jsonError(new Error('The provided license expression is not currently supported'), 422);
+    }
   }
   if (msProperties.administrators && !Array.isArray(msProperties.administrators)) {
     throw jsonError(new Error('Administrators must be an array of logins'), 422);

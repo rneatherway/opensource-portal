@@ -120,9 +120,9 @@ export abstract class IntelligentEngine {
   }
 
   // was in api context:
-  abstract async processMetadataBeforeCall(apiContext: ApiContext, metadata: any);
-  abstract async callApi(apiContext: ApiContext, optionalMessage?: string): Promise<any>;
-  abstract async withResponseUpdateMetadata(apiContext: ApiContext, response: any);
+  abstract processMetadataBeforeCall(apiContext: ApiContext, metadata: any);
+  abstract callApi(apiContext: ApiContext, optionalMessage?: string): Promise<any>;
+  abstract withResponseUpdateMetadata(apiContext: ApiContext, response: any);
 
   abstract withResponseShouldCacheBeServed(apiContext: ApiContext, response: any) : boolean | IShouldServeCache;
   abstract withMetadataShouldCacheBeServed(apiContext: ApiContext, metadata: any): boolean | IShouldServeCache;

@@ -1,0 +1,18 @@
+//- optional text variable: preheader
+//- optional text variable: subject
+//- optional text variable: headline
+//- optional boolean variable: hasAccountInformationSection, which then includes the accountinformation block
+//- optional footer variable: reason
+//- optional footer variables: unsubscribeText, unsubscribeLink
+//- main content block is called content
+//- each main paragraph should have the class "body-text", FYI, for best rendering
+//- for bold/strong: span classname of "bold" plus "em" tag
+//- for body headers, h2.body-text-header
+//- for links, a.body-link
+if subject
+  != '<!-- SUBJECT: ' + subject + ' -->'
+doctype html
+html(lang="en")
+  include 1eshead
+  body(style='background-color: #ffffff')
+    include 1esbody

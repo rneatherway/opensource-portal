@@ -154,6 +154,8 @@ CREATE TABLE IF NOT EXISTS links (
   corporateid text,
   corporateusername text,
   corporatename text,
+  corporatemail text,
+  corporatealias text,
   serviceaccount boolean DEFAULT false,
   serviceaccountmail text,
   created timestamp without time zone,

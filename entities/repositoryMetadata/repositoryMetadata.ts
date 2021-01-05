@@ -20,6 +20,8 @@ export enum GitHubRepositoryPermission {
   Pull = 'pull',
   Push = 'push',
   Admin = 'admin',
+  Triage = 'triage',
+  Maintain = 'maintain',
 }
 
 export enum RepositoryLockdownState {
@@ -31,7 +33,9 @@ export enum RepositoryLockdownState {
 
 export const GitHubRepositoryPermissions = [
   GitHubRepositoryPermission.Pull,
+  GitHubRepositoryPermission.Triage,
   GitHubRepositoryPermission.Push,
+  GitHubRepositoryPermission.Maintain,
   GitHubRepositoryPermission.Admin,
 ];
 

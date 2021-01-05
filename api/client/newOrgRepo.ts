@@ -9,18 +9,21 @@ const router = express.Router();
 
 import _ from 'lodash';
 
-import { ReposAppRequest, IProviders } from '../../transitional';
+import { ReposAppRequest, IProviders, INewRepoMicrosoftMetadata, IMicrosoftMetadataServiceTree } from '../../transitional';
 import { jsonError } from '../../middleware/jsonError';
 import { IndividualContext } from '../../user';
 import { Organization } from '../../business/organization';
 import { CreateRepository, ICreateRepositoryApiResult, CreateRepositoryEntrypoint } from '../createRepo';
 import { Team, GitHubTeamRole } from '../../business/team';
-import { asNumber } from '../../utils';
+import { asNumber, sleep } from '../../utils';
+import { MicrosoftClassification } from '../../microsoft/entities/msftMetadata';
+
+// This file supports the client apps for creating repos.
 
 interface ILocalApiRequest extends ReposAppRequest {
   apiVersion?: string;
   organization?: Organization;
-  knownRequesterMailAddress?: any;
+  knownRequesterMailAddress?: string;
 }
 
 router.get('/metadata', (req: ILocalApiRequest, res, next) => {
@@ -137,12 +140,16 @@ router.get('/repo/:repo', asyncHandler(async (req: ILocalApiRequest, res) => {
   });
 }));
 
-async function discoverUserIdentities(req: ReposAppRequest, res, next) {
+export async function discoverUserIdentities(req: ReposAppRequest, res, next) {
   const apiContext = req.apiContext as IndividualContext;
   const providers = req.app.settings.providers as IProviders;
   const mailAddressProvider = providers.mailAddressProvider;
   // Try and also learn if we know their e-mail address to send the new repo mail to
   const upn = apiContext.corporateIdentity.username;
+  if (apiContext.link && apiContext.link.corporateMailAddress) {
+    req['knownRequesterMailAddress'] = apiContext.link.corporateMailAddress;
+    return next();
+  }
   try {
     const mailAddress = await mailAddressProvider.getAddressFromUpn(upn);
     if (mailAddress) {
@@ -152,11 +159,40 @@ async function discoverUserIdentities(req: ReposAppRequest, res, next) {
   return next();
 }
 
-router.post('/repo/:repo', asyncHandler(discoverUserIdentities), asyncHandler(async function (req: ILocalApiRequest, res, next) {
+router.post('/repo/:repo', asyncHandler(discoverUserIdentities), asyncHandler(createRepositoryFromClient));
+
+export async function createRepositoryFromClient(req: ILocalApiRequest, res, next) {
+  const providers = req.app.settings.providers as IProviders;
+  const { insights, diagnosticsDrop } = providers;
   const individualContext = req.individualContext || req.apiContext;
   const config = req.app.settings.runtimeConfig;
   const organization = req.organization as Organization;
   const existingRepoId = req.body.existingrepoid;
+  const correlationId = req.correlationId;
+  const debugValues = req.body.debugValues || {};
+  const microsoftMetadata = req.body.msftMetadata || {};
+  const corporateId = individualContext.corporateIdentity.id;
+  insights.trackEvent({
+    name: 'CreateRepositoryFromClientStart',
+    properties: {
+      debugValues,
+      correlationId,
+      body: JSON.stringify(req.body),
+      query: JSON.stringify(req.query),
+      microsoftMetadata: JSON.stringify(microsoftMetadata),
+      corporateId,
+    },
+  });
+  if (diagnosticsDrop) {
+    diagnosticsDrop.setObject(`newrepo.${organization.name}.${correlationId}`, {
+      debugValues,
+      correlationId,
+      body: req.body,
+      query: req.query,
+      microsoftMetadata,
+      corporateId,
+    });
+  }
   if (organization.createRepositoriesOnGitHub && !(existingRepoId && organization.isNewRepositoryLockdownSystemEnabled())) {
     return next(jsonError(`The GitHub organization ${organization.name} is configured as "createRepositoriesOnGitHub": repos should be created on GitHub.com directly and not through this wizard.`, 400));
   }
@@ -164,16 +200,37 @@ router.post('/repo/:repo', asyncHandler(discoverUserIdentities), asyncHandler(as
   if (!body) {
     return next(jsonError('No body', 400));
   }
+  if (microsoftMetadata) {
+    try {
+      await validateMicrosoftMetadata(providers, microsoftMetadata);
+    } catch (validationError) {
+      return next(jsonError(validationError, 400));
+    }
+  }
   req.apiVersion = (req.query['api-version'] || req.headers['api-version'] || '2017-07-27') as string;
   if (req.apiContext && req.apiContext.getGitHubIdentity()) {
     body['ms.onBehalfOf'] = req.apiContext.getGitHubIdentity().username;
   }
   // these fields do not need translation: name, description, private
   const approvalTypesToIds = config.github.approvalTypes.fields.approvalTypesToIds;
-  if (!approvalTypesToIds[body.approvalType]) {
-    return next(jsonError('The approval type is not supported or approved at this time', 400));
+  if (approvalTypesToIds[body.approvalType]) {
+    body.approvalType = approvalTypesToIds[body.approvalType];
+  } else {
+    let valid = false;
+    Object.getOwnPropertyNames(approvalTypesToIds).forEach(key => {
+      if (approvalTypesToIds[key] === body.approvalType) {
+        valid = true;
+      }
+    })
+    if (!valid) {
+      return next(jsonError('The approval type is not supported or approved at this time', 400));
+    }
   }
-  body.approvalType = approvalTypesToIds[body.approvalType];
+  // Property supporting private repos from the client
+  if (body.visibility === 'private') {
+    body.private = true;
+    delete body.visibility;
+  }
   translateValue(body, 'approvalType', 'ms.approval');
   translateValue(body, 'approvalUrl', 'ms.approval-url');
   translateValue(body, 'justification', 'ms.justification');
@@ -187,11 +244,11 @@ router.post('/repo/:repo', asyncHandler(discoverUserIdentities), asyncHandler(as
   // Initial repo contents and license
   const templates = _.keyBy(organization.getRepositoryCreateMetadata().templates, 'id');
   const template = templates[body.template];
-  if (!template) {
-    return next(jsonError('There was a configuration problem, the template metadata was not available for this request', 400));
-  }
+  // if (!template) {
+    // return next(jsonError('There was a configuration problem, the template metadata was not available for this request', 400));
+  // }
   translateValue(body, 'template', 'ms.template');
-  body['ms.license'] = template.spdx || template.name; // Today this is the "template name" or SPDX if available
+  body['ms.license'] = template && (template.spdx || template.name); // Today this is the "template name" or SPDX if available
   translateValue(body, 'gitIgnoreTemplate', 'gitignore_template');
   if (!body['ms.notify']) {
     body['ms.notify'] = req.knownRequesterMailAddress || config.brand.operationsMail || config.brand.supportMail;
@@ -199,7 +256,10 @@ router.post('/repo/:repo', asyncHandler(discoverUserIdentities), asyncHandler(as
   // these fields are currently ignored: orgName
   delete body.orgName;
   delete body.claEntity; // a legacy value
-  req.app.settings.providers.insights.trackEvent({
+  // specific fields used by the client tooling
+  delete body.debugValues;
+  delete body.microsoftMetadata;
+  insights.trackEvent({
     name: 'ApiClientNewOrgRepoStart',
     properties: {
       body: JSON.stringify(req.body),
@@ -209,7 +269,7 @@ router.post('/repo/:repo', asyncHandler(discoverUserIdentities), asyncHandler(as
   try {
     success = await CreateRepository(req, body, CreateRepositoryEntrypoint.Client, individualContext);
   } catch (createRepositoryError) {
-    req.app.settings.providers.insights.trackEvent({
+    insights.trackEvent({
       name: 'ApiClientNewOrgRepoError',
       properties: {
         error: createRepositoryError.message,
@@ -221,6 +281,7 @@ router.post('/repo/:repo', asyncHandler(discoverUserIdentities), asyncHandler(as
     }
     return next(createRepositoryError);
   }
+  await configureMicrosoftMetadata(req.app.settings.providers as IProviders, corporateId, existingRepoId || success.github.id, microsoftMetadata);
   let message = success.github ? `Your new repo, ${success.github.name}, has been created:` : 'Your repo request has been submitted.';
   if (existingRepoId && success.github) {
     message = `Your repository ${success.github.name} is classified and the repo is now ready, unlocked, with your selected team permissions assigned.`;
@@ -237,7 +298,7 @@ router.post('/repo/:repo', asyncHandler(discoverUserIdentities), asyncHandler(as
   }
   output.messages = output['tasks'];
   delete output['tasks'];
-  req.app.settings.providers.insights.trackEvent({
+  insights.trackEvent({
     name: 'ApiClientNewOrgRepoSuccessful',
     properties: {
       body: JSON.stringify(body),
@@ -245,7 +306,91 @@ router.post('/repo/:repo', asyncHandler(discoverUserIdentities), asyncHandler(as
     },
   });
   return res.json(output);
-}));
+}
+
+async function configureMicrosoftMetadata(providers: IProviders, corporateId: string, repositoryId: number, bodyMetadata: any): Promise<void> {
+  if (!bodyMetadata) {
+    return;
+  }
+  const { microsoftMetadataProvider, insights } = providers;
+  try {
+    const { maintainers, serviceTree, classification } = projectMicrosoftMetadata(bodyMetadata);
+    const metadata = await microsoftMetadataProvider.getOrCreateMetadata(String(repositoryId));
+    let update = false;
+    if (classification) {
+      metadata.classification = classification;
+      metadata.classificationUpdated = new Date();
+      metadata.classificationUpdatedBy = corporateId;
+    }
+    if (maintainers.securityGroup) {
+      metadata.maintainerSecurityGroup = maintainers.securityGroup;
+      metadata.maintainerUpdated = new Date();
+      metadata.maintainerUpdatedBy = corporateId;
+      update = true;
+    }
+    if (maintainers.individuals && maintainers.individuals.length > 0) {
+      // is a replace, not an upsert
+      metadata.maintainerCorporateIds = maintainers.individuals.join(',');
+      metadata.maintainerUpdated = new Date();
+      metadata.maintainerUpdatedBy = corporateId;
+      update = true;
+    }
+    if (serviceTree && serviceTree.id) {
+      const isExempt = serviceTree.id === 'N/A';
+      metadata.serviceTreeExempt = isExempt;
+      metadata.serviceTreeNode = isExempt === false ? serviceTree.id : null;
+      metadata.serviceTreeUpdated = new Date();
+      metadata.serviceTreeUpdatedBy = corporateId;
+      update = true;
+    }
+    // TODO: Classification, when ready
+    if (update) {
+      await microsoftMetadataProvider.replaceMetadata(metadata);
+    }
+  } catch (metadataSetError) {
+    insights.trackException({ exception: metadataSetError, properties: { event: 'ConfigureMicrosoftMetadataNewRepo' } });
+    // ROBUSTNESS: rollback or?
+    // CONSIDER: best options after the repo is created but the metadata set has issues
+  }
+}
+
+async function validateMicrosoftMetadata(providers: IProviders, bodyMetadata: any) {
+  try {
+    const projected = projectMicrosoftMetadata(bodyMetadata);
+    // TODO: verify the individuals
+    console.dir(projected);
+  } catch (error) {
+    throw jsonError(error, 400);
+  }
+}
+
+function projectMicrosoftMetadata(bodyMetadata: any): INewRepoMicrosoftMetadata {
+  const metadata: INewRepoMicrosoftMetadata = {};
+  if (bodyMetadata?.serviceTree) {
+    metadata.serviceTree = bodyMetadata.serviceTree as IMicrosoftMetadataServiceTree;
+  }
+  if (bodyMetadata?.maintainers) {
+    metadata.maintainers = {
+      individuals: [],
+      securityGroup: bodyMetadata.maintainers.securityGroup,
+    };
+    for (let i = 0; i < 10; i++) { // max at 10 entries
+      const key = `individual${i}`;
+      if (bodyMetadata.maintainers[key]) {
+        metadata.maintainers.individuals.push(bodyMetadata.maintainers[key]);
+      }
+    }
+  }
+  if (bodyMetadata?.classification && bodyMetadata.classification.selectedClassification) {
+    const value = bodyMetadata.classification.selectedClassification;
+    if (value === MicrosoftClassification.NonProduction) {
+      metadata.classification = MicrosoftClassification.NonProduction;
+    } else if (value === MicrosoftClassification.Production) {
+      metadata.classification = MicrosoftClassification.Production;
+    }
+  }
+  return metadata;
+}
 
 function translateTeams(body) {
   let admin = body.selectedAdminTeams;
@@ -277,4 +422,4 @@ function translateValue(object, fromKey, toKey) {
   }
 }
 
-module.exports = router;
+export default router;

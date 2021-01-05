@@ -74,6 +74,7 @@ router.get('/:electionid', asyncHandler(async (req: IFundRequest, res, next) => 
   }
   let votingState = ElectionDisplayState.NotEligible;
   let ballot = null;
+  const doPollsOpenInFuture = (new Date(election.votingStart)) > (new Date());
   let vote = await elections.hasVoted(corporateId, electionId);
   if (vote) {
     votingState = ElectionDisplayState.Voted;
@@ -104,6 +105,7 @@ router.get('/:electionid', asyncHandler(async (req: IFundRequest, res, next) => 
       election,
       votingState,
       ballot,
+      doPollsOpenInFuture,
       results,
       totalVotes,
       vote,

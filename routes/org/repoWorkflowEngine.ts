@@ -166,6 +166,10 @@ export class RepoWorkflowEngine {
       shouldRenameDefaultBranch = false;
       output.push({ message: `As a transfer, the default branch will not be automatically renamed to '${this.renameDefaultBranchTo}'.`});
     }
+    if (shouldRenameDefaultBranch && !request.initialGitIgnoreTemplate && !request.initialTemplate) {
+      output.push({ message: 'Without a .gitignore or template, there are no commits to change the default branch'});
+      shouldRenameDefaultBranch = false;
+    }
     if (shouldRenameDefaultBranch && this.renameDefaultBranchExcludeIfApiCall && this.createEntrypoint === CreateRepositoryEntrypoint.Api) {
       shouldRenameDefaultBranch = false;
       output.push({ message: `The branch will not be automatically renamed to '${this.renameDefaultBranchTo}' because the repository has been created by an API call.`});

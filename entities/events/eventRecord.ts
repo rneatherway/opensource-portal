@@ -67,6 +67,7 @@ enum Query {
   ContributionsByCorporateIdDateRange = 'ContributionsByCorporateIdDateRange',
   ContributionsByDateRange = 'ContributionsByDateRange',
   DistinctEligibleContributorsByDateRange = 'DistinctEligibleContributorsByDateRange',
+  DistinctPublicContributorsByDateRange = 'DistinctPublicContributorsByDateRange',
   DistinctOrganizations = 'DistinctOrganizations',
   PopularContributionsByDateRange = 'PopularContributionsByDateRange',
   RecentContributionsBySpecificOptInUsers = 'RecentContributionsBySpecificOptInUsers',
@@ -231,6 +232,25 @@ EntityMetadataMappings.Register(type, PostgresSettings.PostgresQueries, (query: 
           WHERE
               isopencontribution = True
           AND created >= $1
+          AND created < $2
+          `),
+        values: [
+          start,
+          end,
+        ],
+        skipEntityMapping: true,
+      };
+    }
+    case Query.DistinctPublicContributorsByDateRange: {
+      const { start, end } = (base as EventQuery<ParametersStartEndDates>).parameters;
+      return {
+        sql: (`
+          SELECT
+            DISTINCT(userid) as userid
+          FROM
+            ${tableName}
+          WHERE
+              created >= $1
           AND created < $2
           `),
         values: [
@@ -419,6 +439,7 @@ export interface IEventRecordProvider {
   queryOpenContributionEventsByDateRangeAndThirdPartyId(thirdPartyId: string, startDate: Date, endDate: Date, limitToOpenContributionsOnly: boolean): Promise<EventRecord[]>;
   queryOpenContributionEventsByDateRangeAndCorporateId(corporateId: string, startDate: Date, endDate: Date, limitToOpenContributionsOnly: boolean): Promise<EventRecord[]>;
   queryDistinctEligibleContributors(startDate: Date, endDate: Date): Promise<string[]>;
+  queryDistinctPublicContributors(startDate: Date, endDate: Date): Promise<string[]>;
   queryDistinctOrganizations(): Promise<string[]>;
   queryPopularContributions(startDate: Date, endDate: Date): Promise<any[]>;
   querySpecificContributions(startDate: Date, endDate: Date, limit: number, specificActionExclusions: string[]): Promise<EventRecord[]>;
@@ -488,6 +509,12 @@ export class EventRecordProvider extends EntityMetadataBase implements IEventRec
 
   async queryDistinctEligibleContributors(start: Date, end: Date): Promise<string[]> {
     const query = new EventQuery<ParametersStartEndDates>(Query.DistinctEligibleContributorsByDateRange, { start, end });
+    const results = await this._entities.fixedQueryMetadata(thisProviderType, query);
+    return results.map(row => row['userid']);
+  }
+
+  async queryDistinctPublicContributors(start: Date, end: Date): Promise<string[]> {
+    const query = new EventQuery<ParametersStartEndDates>(Query.DistinctPublicContributorsByDateRange, { start, end });
     const results = await this._entities.fixedQueryMetadata(thisProviderType, query);
     return results.map(row => row['userid']);
   }

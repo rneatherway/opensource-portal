@@ -69,6 +69,8 @@ import { ElectionNominationEntityProvider } from '../entities/voting/nomination'
 import { ElectionNominationCommentEntityProvider } from '../entities/voting/nominationComment';
 import { IReposApplication } from '../app';
 import { UserSettingsProvider } from '../entities/userSettings';
+import { createAndInitializeMicrosoftMetadataProviderInstance } from '../microsoft/entities/msftMetadata';
+import { ProductCatalog } from '../microsoft/productCatalog/productCatalog';
 
 const DefaultApplicationProfile: IApplicationProfile = {
   applicationName: 'GitHub Management Portal',
@@ -159,6 +161,7 @@ async function initializeAsync(app: IReposApplication, express, rootdir: string,
   // providers.entityMetadata = await createAndInitializeEntityMetadataProviderInstance(app, config, providers);
   providers.approvalProvider = await createAndInitializeApprovalProviderInstance({ entityMetadataProvider: providerNameToInstance(config.entityProviders.teamjoin) });
   providers.repositoryMetadataProvider = await createAndInitializeRepositoryMetadataProviderInstance({ entityMetadataProvider: providerNameToInstance(config.entityProviders.repositorymetadata) });
+  providers.microsoftMetadataProvider = await createAndInitializeMicrosoftMetadataProviderInstance({ entityMetadataProvider: providerNameToInstance(config.microsoft?.entityProviders?.microsoftmetadata) });
   providers.tokenProvider = await createTokenProvider({ entityMetadataProvider: providerNameToInstance(config.entityProviders.tokens) });
   providers.localExtensionKeyProvider = await CreateLocalExtensionKeyProvider({ entityMetadataProvider: providerNameToInstance(config.entityProviders.localextensionkey) });
   providers.organizationMemberCacheProvider = await CreateOrganizationMemberCacheProviderInstance({ entityMetadataProvider: providerNameToInstance(config.entityProviders.organizationmembercache) });
@@ -196,6 +199,17 @@ async function initializeAsync(app: IReposApplication, express, rootdir: string,
   } else if (config.session.provider === 'redis') {
     const redisSessionClient = await connectRedis(config, config.session.redis, 'session');
     providers.sessionRedisClient = redisSessionClient;
+  }
+  if (config?.microsoft?.productCatalog?.appId) {
+    providers.productCatalog = new ProductCatalog(config.microsoft.productCatalog);
+  }
+  if (config?.diagnostics?.blob?.key) {
+    providers.diagnosticsDrop = new BlobCache({
+      key: config.diagnostics.blob.key,
+      account: config.diagnostics.blob.account,
+      container: config.diagnostics.blob.container,
+    });
+    await providers.diagnosticsDrop.initialize();
   }
 
   providers.corporateContactProvider = createCorporateContactProviderInstance(config, providers.cacheProvider);
@@ -261,8 +275,11 @@ function configureGitHubLibrary(app, redis, linkProvider: ILinkProvider, config)
 
 // Asynchronous initialization for the Express app, configuration and data stores.
 export default async function initialize(app: IReposApplication, express, rootdir: string, config: any, exception: Error): Promise<IReposApplication> {
-  const applicationProfile = config.web.app && config.web.app !== 'repos' ? await alternateRoutes(config, app, config.web.app) : DefaultApplicationProfile;
-  const web = !(config.skipModules && config.skipModules.has('web'));
+  if (!config) {
+    throw new Error('No configuration resolved');
+  }
+  const applicationProfile = config?.web?.app && config.web.app !== 'repos' ? await alternateRoutes(config, app, config.web.app) : DefaultApplicationProfile;
+  const web = !(config?.skipModules && config.skipModules.has('web'));
   if (applicationProfile.webServer && !web) {
     applicationProfile.webServer = false;
   }
@@ -399,11 +416,13 @@ function createGraphProvider(config: any): Promise<IGraphProvider> {
     CreateGraphProviderInstance(config, (providerInitError: Error, provider: IGraphProvider) => {
       if (providerInitError) {
         debug(`No org chart graph provider configured: ${providerInitError.message}`);
-        // NOTE: never rejects
+        if (config.graph?.require === true) {
+          return reject(new Error(`Unable to initialize the graph provider: ${providerInitError.message}`));
+        }
       } else {
         return resolve(provider);
       }
-      return resolve();
+      return resolve(null);
     });
   });
 }
@@ -446,7 +465,7 @@ export function ConnectPostgresPool(postgresConfigSection: any): Promise<Postgre
           })
         })
       } else {
-        return resolve();
+        return resolve(undefined);
       }
     } catch (failProblem) {
       return reject(failProblem);

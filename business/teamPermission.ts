@@ -5,7 +5,7 @@
 
 import { Organization } from "./organization";
 import { Operations } from "./operations";
-import { Team } from "./team";
+import { Team, TeamJsonFormat } from "./team";
 import { ICacheOptions } from "../transitional";
 import { TeamMember } from "./teamMember";
 
@@ -19,6 +19,16 @@ export class TeamPermission {
   private _privacy: any;
 
   private _teamMembersIfSet: TeamMember[];
+
+  asJson() {
+    const members = this._teamMembersIfSet;
+    return {
+      permission: this._permission,
+      privacy: this._privacy,
+      team: this._team?.asJson(TeamJsonFormat.Augmented),
+      members: members ? members.map(member => member.asJson()) : undefined,
+    }
+  }
 
   get permission(): any {
     return this._permission;

@@ -70,14 +70,14 @@ export default class AutomaticTeamsWebhookProcessor implements WebhookProcessor 
     return false;
   }
 
-  async run(operations: Operations, organization, data: any): Promise<boolean> {
+  async run(operations: Operations, organization: Organization, data: any): Promise<boolean> {
     const eventType = data.properties.event;
     const eventAction = data.body.action;
     const { specialTeamIds, specialTeamLevels } = this.processOrgSpecialTeams(organization);
     const preventLargeTeamPermissions = organization.preventLargeTeamPermissions;
     const repositoryBody = data.body.repository;
     const newPermissions = repositoryBody ? repositoryBody.permissions : null;
-    const whoChangedIt = data.body && data.body.sender ? data.body.sender.login : null;
+    const whoChangedIt = (data.body && data.body.sender ? data.body.sender.login : null) as string;
     const whoChangedItId = whoChangedIt ? data.body.sender.id : null;
 
     // New repository
@@ -116,8 +116,7 @@ export default class AutomaticTeamsWebhookProcessor implements WebhookProcessor 
         // 6/13/17. Thank you for helping us simplify our code!
         if (['added_to_repository', 'edited'].includes(eventAction) && newPermissions) {
           const specificReason = teamTooLargeForPurpose(teamId, newPermissions.admin, newPermissions.push, organization, teamSize, preventLargeTeamPermissions);
-          if (specificReason) {
-            // CONSIDER: system/ops accounts may actually be useful to consider allowing via operations.isSystemAccountByUsername
+          if (specificReason && !operations.isSystemAccountByUsername(whoChangedIt)) {
             await revertLargePermissionChange(operations, organization, repositoryBody, teamId, teamName, whoChangedIt, whoChangedItId, specificReason);
           }
         }
@@ -160,7 +159,7 @@ function translateSpecialToGitHub(ourTerm) {
   throw new Error(`Unknown team type ${ourTerm}`);
 }
 
-async function getTeamSize(organization: Organization, teamId): Promise<number> {
+export async function getTeamSize(organization: Organization, teamId): Promise<number> {
   const team = organization.team(teamId);
   await team.getDetails();
   return team.members_count || 0;

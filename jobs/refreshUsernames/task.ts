@@ -6,6 +6,7 @@
 /*eslint no-console: ["error", { allow: ["warn", "dir", "log"] }] */
 
 import throat from 'throat';
+import { shuffle } from 'lodash';
 
 import { createAndInitializeLinkProviderInstance, ILinkProvider } from '../../lib/linkProviders';
 import { ICorporateLink } from '../../business/corporateLink';
@@ -21,7 +22,7 @@ export default async function refresh({ providers }: IReposJob): Promise<IReposJ
   const graphProvider = providers.graphProvider;
 
   console.log('reading all links');
-  const allLinks = await getAllLinks(linkProvider);
+  const allLinks = shuffle(await getAllLinks(linkProvider));
   console.log(`READ: ${allLinks.length} links`);
   insights.trackEvent({ name: 'JobRefreshUsernamesReadLinks', properties: { links: String(allLinks.length) } });
 
@@ -33,6 +34,7 @@ export default async function refresh({ providers }: IReposJob): Promise<IReposJ
   let updatedUsernames = 0;
   let updatedAvatars = 0;
   let updatedAadNames = 0;
+  let updatedCorporateMails = 0;
   let updatedAadUpns = 0; // should be super rare
 
   const userDetailsThroatCount = 1;
@@ -42,7 +44,9 @@ export default async function refresh({ providers }: IReposJob): Promise<IReposJ
   const maxAgeSeconds = 24 * 60 * 60; // details can be a day out-of-date
 
   const throttle = throat(userDetailsThroatCount);
+  let i = 0;
   await Promise.all(allLinks.map((link: ICorporateLink) => throttle(async () => {
+    ++i;
     // Refresh GitHub username for the ID
     let id = link.thirdPartyId;
     const account = operations.getAccount(id);
@@ -80,14 +84,24 @@ export default async function refresh({ providers }: IReposJob): Promise<IReposJ
             changed = true;
             ++updatedAadNames;
           }
+          if (graphInfo.mail && link.corporateMailAddress !== graphInfo.mail) {
+            link.corporateMailAddress = graphInfo.mail;
+            changed = true;
+            ++updatedCorporateMails;
+          }
+          if (graphInfo.mailNickname && link.corporateAlias !== graphInfo.mailNickname.toLowerCase()) {
+            link.corporateAlias = graphInfo.mailNickname.toLowerCase();
+            changed = true;
+          }
         }
       } catch (graphLookupError) {
         // Ignore graph lookup issues, other jobs handle terminated employees
+        console.dir(graphLookupError);
       }
 
       if (changed) {
         await updateLink(linkProvider, link);
-        console.log(`Updates saved for GitHub user ID ${id}`);
+        console.log(`${i}/${allLinks.length}: Updates saved for GitHub user ID ${id}`);
         ++updates;
       }
     } catch (getDetailsError) {
@@ -102,6 +116,7 @@ export default async function refresh({ providers }: IReposJob): Promise<IReposJ
           insights.trackException({ exception: unlinkDeletedAccountError, properties: { githubid: id, event: 'JobRefreshUsernamesDeleteError' } });
         }
       } else {
+        console.dir(getDetailsError);
         ++errors;
         insights.trackException({ exception: getDetailsError, properties: { name: 'JobRefreshUsernamesError' } });
         errorList.push(getDetailsError);
@@ -123,6 +138,7 @@ export default async function refresh({ providers }: IReposJob): Promise<IReposJ
   console.log(`GitHub avatar changes: ${updatedAvatars}`);
   console.log(`AAD name changes: ${updatedAadNames}`);
   console.log(`AAD username changes: ${updatedAadUpns}`);
+  console.log(`Updated corporate mails: ${updatedCorporateMails}`);
 
   return {
     successProperties: {
@@ -131,6 +147,7 @@ export default async function refresh({ providers }: IReposJob): Promise<IReposJ
       updatedAvatars,
       updatedAadNames,
       updatedAadUpns,
+      updatedCorporateMails,
       errors,
     },
   };

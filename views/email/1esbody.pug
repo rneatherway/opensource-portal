@@ -1,0 +1,74 @@
+if preheader
+  .preheader
+    // BEGIN PREHEADER TEXT
+    = preheader
+    // END PREHEADER TEXT
+
+table.main-container(align='center', width='616')
+  tbody
+    tr
+      td.azurelogo-container
+        //-img.azure-logo(src='https://cxpsncdn1.azureedge.net/cxpsnemail/LogoAzureGrey.png', alt='Microsoft Azure', title='Microsoft Azure', height='22', width='155')
+        //-img.azure-logo(src='https://ospomail.azureedge.net/1es-2x.png', alt='Microsoft One Engineering System', title='Microsoft One Engineering System', height='38', width='368')
+        img.azure-logo(src='https://ospomail.azureedge.net/1ES.png', alt='Microsoft One Engineering System', title='Microsoft One Engineering System', height='38', width='368', style='height:38px;width:368px')
+    tr
+      td.body-container
+        div(style='border-bottom: 1px solid #dddddd; padding-bottom: 15px; max-width: 616px; overflow-wrap: break-word;')
+          h1.body-text-title= headline || subject
+          block content
+            != content
+    if hasAccountInformationSection
+      // BEGIN ACCOUNT INFORMATION SECTION
+      tr
+        td.accountinfo-container
+          block accountinformation
+            != accountinformation
+      // END ACCOUNT INFORMATION SECTION
+    if showSurvey !== false
+      // BEGIN SURVEY SECTION
+      tr
+        td.survey-container
+          p.body-text.
+            Please help us improve our communication by telling us what you think 
+            about this email at #[a.body-link(href='mailto:github@microsoft.com') github@microsoft.com].
+      // END SURVEY SECTION
+
+    tr
+      td.footer-container
+        p.footer-text.
+          This message from Microsoft is an important part of a program or service 
+          that is provided to your account or organization at Microsoft. Microsoft 
+          respects your privacy. Please read 
+          our #[a.footer-link(href='https://privacy.microsoft.com/en-US/privacystatement', target='_blank', title='Privacy Statement') Privacy Statement].
+        p.footer-text
+          if reason
+            = reason
+          else
+            | This is a mandatory service communication as a user of Microsoft engineering systems such as Azure DevOps and/or GitHub.
+        if unsubscribeText && unsubscribeLink
+          p.footer-text: a.footer-link(href=unsubscribeLink, target='_blank')= unsubscribeText
+        if correlationId || view
+          p.footer-text
+            if version
+              | Repos #{version}
+              br
+            if correlationId
+              | Correlation ID: #{correlationId}
+            if correlationId && view
+              br
+            if view
+              | Template: #{view}
+        p.footer-text.
+          GitHub and Open Source Resources at 
+          Microsoft: #[a.footer-link(href='https://aka.ms/opensource', target='_blank') aka.ms/opensource], 
+          #[a.footer-link(href='https://stackoverflow.microsoft.com/tags/opensource', target='_blank') StackOverflow@MS], 
+          #[a.footer-link(href='https://aka.ms/opensource/portal', target='_blank') GitHub Management Portal], 
+          #[a.footer-link(href='mailto:opensource@microsoft.com', target='_blank') Open Source Champs], 
+          #[a.footer-link(href='https://aka.ms/opensourcechannel', target='_blank') Open Source Channel on Teams], 
+          #[a.footer-link(href='https://repos.opensource.microsoft.com/support', target='_blank') Support Options]
+        p.footer-text.
+          Open Source Programs Office#[br]
+          One Engineering System#[br]
+          Microsoft Corporation#[br]
+          #[span.no-wrap(style='display: inline-block;word-break: keep-all; text-decoration: none;') One Microsoft Way, Redmond, WA 98052]
+        img.microsoft-logo(src='https://cxpsncdn1.azureedge.net/cxpsnemail/LogoMicrosoftGrey.png', alt='Microsoft', title='Microsoft', height='22', width='103')

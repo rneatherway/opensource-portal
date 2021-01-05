@@ -38,7 +38,6 @@ export default async function permissionsRun({ providers }: IReposJob) : Promise
       for (let repo of repos) {
         console.log(`${repo.organization.name}/${repo.name}`);
         sleep(1000 * delayBetweenSeconds);
-
         const cacheOptions = {
           maxAgeSeconds: 10 * 60 /* 10m */,
           backgroundRefresh: false,
@@ -62,7 +61,7 @@ export default async function permissionsRun({ providers }: IReposJob) : Promise
         }
         const currentPermissions = new Map<number, TeamPermission>();
         permissions.forEach(entry => {
-          currentPermissions.set(entry.team.id, entry.permission);
+          currentPermissions.set(Number(entry.team.id), entry.permission);
         });
         const teamsToSet = new Set<number>();
         specialTeamIds.forEach(specialTeamId => {

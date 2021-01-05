@@ -20,9 +20,9 @@
 const onlySupportedThirdPartyType = 'github';
 
 import { v4 as uuidV4 } from 'uuid';
-import { InnerError } from "../../../transitional";
 
-import { ICorporateLinkProperties, ICorporateLink, ICorporateLinkExtended } from "../../../business/corporateLink";
+import { InnerError } from '../../../transitional';
+import { ICorporateLinkProperties, ICorporateLink, ICorporateLinkExtended } from '../../../business/corporateLink';
 
 import { CorporateLinkPostgres } from './postgresLink';
 import { PostgresPoolQueryAsync, PostgresPoolQuerySingleRowAsync } from '../../postgresHelpers';
@@ -53,6 +53,9 @@ const linkInterfacePropertyMapping : IPostgresLinkProperties = {
   corporateId: 'corporateid',
   corporateUsername: 'corporateusername',
   corporateDisplayName: 'corporatename',
+  corporateMailAddress: 'corporatemail',
+  corporateAlias: 'corporatealias',
+  
   isServiceAccount: 'serviceaccount',
   serviceAccountMail: 'serviceaccountmail',
 
@@ -69,6 +72,8 @@ const coreColumns = [
   'corporateid',
   'corporateusername',
   'corporatename',
+  'corporatemail',
+  'corporatealias',
   'serviceaccount',
   'serviceaccountmail',
   'created',

@@ -1,0 +1,173 @@
+
+        .preheader {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0;
+          color: #f4f4f4;
+          height: 0;
+          width: 0;
+          line-height: 1px;
+          font-size: 1px;
+          max-height: 0;
+          max-width: 0;
+          overflow: hidden;
+      }
+
+      .main-container {
+          font-family: "Segoe UI", -apple-system, system-ui, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+          font-weight: 400;
+          color: #1a1a1a;
+          margin: auto;
+          max-width: 616px !important;
+      
+      }
+
+      .body-container {
+          padding: 10px 25px 0px 25px;
+      }
+
+      .body-text {
+          line-height: 20px;
+          font-size: 14px;
+          text-align: left;
+      }
+
+      .bold {
+          font-weight: 600 !important;
+      }
+
+      .body-link {
+          color: #0072c6;
+          text-decoration: none;
+      }
+
+
+      .body-text-title {
+          font-family: "Segoe UI", -apple-system, system-ui, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+          font-weight: 400;
+          padding: 0;
+          margin-bottom: 10px;
+          line-height: 30px;
+          font-size: 24px;
+       
+      }
+
+      .body-text-header {
+          font-family: "Segoe UI", -apple-system, system-ui, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+          font-weight: 400;
+          padding: 0;
+          margin-bottom: 10px;
+          line-height: 26px;
+          font-size: 20px;
+        
+      }
+
+      .body-table {
+          display: inline-block;
+          border: none;
+          border-collapse: collapse;
+          margin: 15px 0px 15px 0px;
+      }
+
+      .table-cell {
+          font-family: "Segoe UI", -apple-system, system-ui, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+          color: #1a1a1a;
+          border-collapse: collapse;
+          border: 1px solid black;
+          padding: 5px;
+          text-align: center;
+      }
+
+      .code {
+          background: #f4f4f4;
+          background-color: #f4f4f4;
+          border-radius: 3px;
+          color: #1a1a1a;
+          display: inline-block;
+          font-family: "Courier New", Courier, monospace;
+          font-size: 12px;
+          margin: 2px;
+          padding: 2px;
+          max-width: 616px;
+          overflow-wrap: break-word;
+          
+        
+
+      }
+
+      .accountinfo-container {
+          padding: 0px 25px 25px 25px;
+      }
+
+      .accountinfo-card {
+          border-bottom: 1px solid #dddddd;
+          padding-bottom: 15px;
+      }
+
+      .survey-container {
+          padding: 0px 25px 15px 25px;
+      }
+
+      .survey-link {
+          color: #4875c7;
+          font-family: "Segoe UI", -apple-system, system-ui, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+          font-weight: 400;
+          font-size: 18px;
+          padding: 5px;
+          Margin: 0;
+          text-align: center;
+          line-height: 20px;
+          text-decoration: none;
+          display: inline-block;
+      }
+
+      .footer-container {
+          padding: 25px;
+          background-color: #f4f4f4;
+      }
+
+      .azurelogo-container {
+          padding: 0px 30px 0px 25px;
+          
+      }
+
+      .azure-logo {
+          height: 22px !important;
+          width: 155px !important;
+      }
+
+      .microsoft-logo {
+          outline: none;
+          text-decoration: none;
+          width: 103px;
+          max-width: 100%;
+          clear: both;
+          display: block;
+          height: 22px;
+      }
+
+      .footer-text {
+          Margin: 0;
+          color: #6a6a6a;
+          font-family: "Segoe UI", -apple-system, system-ui, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+          font-weight: 400;
+          padding: 0;
+          text-align: left;
+          line-height: 18px !important;
+          font-size: 12px !important;
+          Margin-bottom: 6px;
+          word-wrap: normal;
+      }
+
+      .footer-link {
+          color: #6a6a6a;
+          font-family: "Segoe UI", -apple-system, system-ui, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+          font-weight: 400;
+          text-decoration: underline;
+      }
+
+      .social-icon {
+          height: 16px !important;
+          width: 26px;
+          margin-bottom: 10px;
+      }
